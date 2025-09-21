@@ -1,87 +1,390 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Live Notes (GitHub Storage)</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #121212;
-      color: #fff;
-      text-align: center;
-      padding: 20px;
-    }
-    textarea {
-      width: 80%;
-      height: 300px;
-      background: #1e1e1e;
-      color: #fff;
-      border: 1px solid #00ffcc;
-      border-radius: 10px;
-      padding: 10px;
-      font-size: 16px;
-    }
-    button {
-      margin-top: 15px;
-      padding: 10px 20px;
-      border: none;
-      border-radius: 8px;
-      background: #00ffcc;
-      font-weight: bold;
-      cursor: pointer;
-    }
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Live Notes P2P (serverless)</title>
+<style>
+  :root{--bg:#0b1220;--card:#0f1724;--muted:#9aa7b2;--accent:#60a5fa}
+  *{box-sizing:border-box;font-family:Inter,Segoe UI,Arial,sans-serif}
+  body{margin:18px;background:linear-gradient(180deg,#071123,#071827);color:#e6eef6}
+  .wrap{max-width:1100px;margin:0 auto;background:var(--card);padding:14px;border-radius:10px}
+  header{display:flex;align-items:center;gap:10px}
+  h1{margin:0;font-size:1.05rem}
+  .controls{margin-left:auto;display:flex;gap:8px}
+  button{padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.05);background:transparent;color:var(--muted);cursor:pointer}
+  button.primary{background:linear-gradient(90deg,var(--accent),#3b82f6);color:#03203b;border:none}
+  .grid{display:grid;grid-template-columns:320px 1fr;gap:12px;margin-top:12px}
+  .panel{background:rgba(255,255,255,0.02);padding:10px;border-radius:8px}
+  textarea, input{width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.03);background:transparent;color:inherit}
+  #editor{min-height:52vh;padding:12px;border-radius:8px;background:rgba(0,0,0,0.2);outline:none;white-space:pre-wrap}
+  .small{font-size:0.85rem;color:var(--muted)}
+  .row{display:flex;gap:8px;align-items:center}
+  .signal-box{height:110px;overflow:auto;font-size:0.85rem;background:rgba(0,0,0,0.12);padding:8px;border-radius:6px}
+  .status{padding:6px;border-radius:6px;font-weight:600}
+  .status.off{background:rgba(255,0,0,0.08);color:#ffb3b3}
+  .status.on{background:rgba(0,255,100,0.06);color:#bfffd6}
+  @media (max-width:900px){.grid{grid-template-columns:1fr}}
+</style>
 </head>
 <body>
-  <h1>Live Notes</h1>
-  <textarea id="notes" placeholder="Loading notes..."></textarea>
-  <br>
-  <button onclick="saveNotes()">Save Notes</button>
+  <div class="wrap">
+    <header>
+      <h1>Live Notes — P2P (no DB)</h1>
+      <div class="controls">
+        <button id="newNote">New</button>
+        <button id="exportBtn">Export</button>
+        <button id="importBtn">Import</button>
+        <button id="clearBtn">Clear</button>
+      </div>
+    </header>
 
-  <script>
-    const repoOwner = "saaid-saroash";   // <-- replace with your GitHub username
-    const repoName = "notes";       // <-- replace with your repo name
-    const filePath = "notes.txt";
-    const branch = "main";               // or "master" depending on repo
+    <div class="grid">
+      <div>
+        <div class="panel">
+          <div class="small">Session (manual signaling — copy & paste):</div>
+          <div style="margin-top:8px" class="row">
+            <button id="createBtn" class="primary">Create session (offer)</button>
+            <button id="joinBtn">Join (paste offer)</button>
+          </div>
 
-    const token = "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";     // ⚠️ temporary, we’ll secure later
+          <div style="margin-top:10px">
+            <div class="small">Share string (Offer or Reply). Copy to other peer:</div>
+            <div id="outSignal" class="signal-box" contenteditable="false" aria-label="Outgoing signal"></div>
+            <div style="margin-top:8px" class="row">
+              <button id="copyOut">Copy</button>
+              <button id="clearOut">Clear</button>
+            </div>
+          </div>
 
-    const notesBox = document.getElementById("notes");
+          <div style="margin-top:10px">
+            <div class="small">Paste remote string here (Offer or Reply):</div>
+            <textarea id="inSignal" rows="4" placeholder="Paste remote string then click Apply"></textarea>
+            <div style="margin-top:8px" class="row">
+              <button id="applyIn">Apply</button>
+            </div>
+          </div>
 
-    // Load existing notes
-    fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}?ref=${branch}`, {
-      headers: { Authorization: `token ${token}` }
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.content) {
-        const content = atob(data.content);
-        notesBox.value = content;
-      }
-    });
+          <hr style="margin:12px 0;border:none;border-top:1px solid rgba(255,255,255,0.03)">
 
-    // Save notes back to repo
-    function saveNotes() {
-      const content = btoa(notesBox.value);
-      fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`, {
-        method: "PUT",
-        headers: {
-          "Authorization": `token ${token}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          message: "Update notes",
-          content: content,
-          branch: branch,
-          sha: window.latestSha
-        })
-      })
-      .then(res => res.json())
-      .then(data => {
-        alert("Notes saved!");
-        window.latestSha = data.content.sha;
-      });
+          <div class="small">Connection:</div>
+          <div style="margin-top:6px" id="connStatus" class="status off">disconnected</div>
+          <div style="margin-top:8px" class="small">Peers connected: <span id="peerCount">0</span></div>
+
+          <hr style="margin:12px 0;border:none;border-top:1px solid rgba(255,255,255,0.03)">
+
+          <div class="small">Notes backup:</div>
+          <div style="margin-top:6px" class="small">Autosaves locally. Export/Import to move content across devices.</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel" style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="title" placeholder="Untitled note" style="font-weight:700" />
+            <div class="small" id="lastSaved">—</div>
+            <div style="margin-left:auto" class="small">Sync: <span id="syncMethod">Local / P2P</span></div>
+          </div>
+
+          <div id="editor" contenteditable="true" spellcheck="true" aria-label="Editor">Start typing…</div>
+
+          <div style="display:flex;gap:8px">
+            <button id="boldBtn">Bold</button>
+            <button id="italicBtn">Italic</button>
+            <button id="shareBtn">Generate Share (base64)</button>
+            <button id="loadShareBtn">Load Share</button>
+            <button id="clearShareBtn">Clear Share</button>
+          </div>
+
+          <div style="margin-top:6px" class="small">Share string contains current note content (one-off snapshot) — useful to send a static copy.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* live-notes-p2p.js — serverless WebRTC with manual signaling */
+const LS_KEY = 'live-notes-p2p-v1';
+const pcConfig = { iceServers: [{urls:['stun:stun.l.google.com:19302']}] }; // STUN only
+let pc = null;
+let dc = null;
+let isInitiator = false;
+let remoteCandidates = [];
+let peers = 0;
+
+/* DOM */
+const createBtn = document.getElementById('createBtn');
+const joinBtn = document.getElementById('joinBtn');
+const outSignal = document.getElementById('outSignal');
+const inSignal = document.getElementById('inSignal');
+const applyIn = document.getElementById('applyIn');
+const copyOut = document.getElementById('copyOut');
+const clearOut = document.getElementById('clearOut');
+const connStatus = document.getElementById('connStatus');
+const peerCount = document.getElementById('peerCount');
+const editor = document.getElementById('editor');
+const titleInput = document.getElementById('title');
+const lastSaved = document.getElementById('lastSaved');
+const exportBtn = document.getElementById('exportBtn');
+const importBtn = document.getElementById('importBtn');
+const newNote = document.getElementById('newNote');
+const clearBtn = document.getElementById('clearBtn');
+const shareBtn = document.getElementById('shareBtn');
+const loadShareBtn = document.getElementById('loadShareBtn');
+const clearShareBtn = document.getElementById('clearShareBtn');
+const syncMethod = document.getElementById('syncMethod');
+
+function setStatus(on) {
+  connStatus.className = 'status ' + (on ? 'on' : 'off');
+  connStatus.textContent = on ? 'connected' : 'disconnected';
+}
+function setPeerCount(n){ peerCount.textContent = n; peers = n; }
+
+/* Local persistence & tab sync */
+const bc = ('BroadcastChannel' in window) ? new BroadcastChannel('live-notes-p2p') : null;
+let state = { title: 'Untitled', content: '', updated: Date.now() };
+
+function saveLocal(){
+  state.title = titleInput.value || 'Untitled';
+  state.content = editor.textContent;
+  state.updated = Date.now();
+  localStorage.setItem(LS_KEY, JSON.stringify(state));
+  lastSaved.textContent = 'Last saved: ' + new Date(state.updated).toLocaleString();
+  if (bc) bc.postMessage({type:'local', state});
+}
+function loadLocal(){
+  const raw = localStorage.getItem(LS_KEY);
+  if (raw) { try{ state = JSON.parse(raw) }catch(e){} }
+  titleInput.value = state.title || 'Untitled';
+  editor.textContent = state.content || '';
+  lastSaved.textContent = state.updated ? ('Last saved: ' + new Date(state.updated).toLocaleString()) : '—';
+}
+if (bc) bc.onmessage = (ev)=>{ if(ev.data && ev.data.type==='local'){ state = ev.data.state; titleInput.value = state.title; editor.textContent = state.content; lastSaved.textContent = 'Updated in another tab'; } };
+
+/* UI events */
+editor.addEventListener('input', ()=>{ saveLocal(); sendPatch({type:'patch', content: editor.textContent, title: titleInput.value}); });
+titleInput.addEventListener('input', saveLocal);
+newNote.addEventListener('click', ()=>{ titleInput.value='Untitled'; editor.textContent=''; saveLocal(); });
+clearBtn.addEventListener('click', ()=>{ if(confirm('Clear local notes?')){ titleInput.value='Untitled'; editor.textContent=''; saveLocal(); }});
+
+exportBtn.addEventListener('click', ()=>{
+  const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download='notes.json'; a.click(); URL.revokeObjectURL(a.href);
+});
+importBtn.addEventListener('click', ()=>{
+  const inp = document.createElement('input'); inp.type='file'; inp.accept='application/json';
+  inp.onchange = e=>{
+    const f = e.target.files[0]; if(!f) return;
+    const r = new FileReader();
+    r.onload = ev => { try{ const obj = JSON.parse(ev.target.result); state = obj; titleInput.value = state.title||'Untitled'; editor.textContent = state.content||''; saveLocal(); alert('Imported'); }catch(e){ alert('Invalid file'); } };
+    r.readAsText(f);
+  };
+  inp.click();
+});
+
+/* Quick formatting */
+document.getElementById('boldBtn').addEventListener('click', ()=>document.execCommand('bold'));
+document.getElementById('italicBtn').addEventListener('click', ()=>document.execCommand('italic'));
+
+/* Share snapshot */
+shareBtn.addEventListener('click', ()=>{
+  const payload = btoa(unescape(encodeURIComponent(JSON.stringify({title: titleInput.value, content: editor.textContent}))));
+  navigator.clipboard.writeText(location.origin + location.pathname + '#share=' + payload).then(()=>alert('Share link copied'));
+});
+loadShareBtn.addEventListener('click', ()=>{
+  const h = location.hash.match(/#share=([^&]+)/);
+  if(!h) return alert('No share string in URL');
+  try{
+    const raw = decodeURIComponent(escape(atob(h[1])));
+    const obj = JSON.parse(raw);
+    titleInput.value = obj.title || 'Shared';
+    editor.textContent = obj.content || '';
+    saveLocal();
+    alert('Loaded shared snapshot into editor.');
+  }catch(e){ alert('Invalid share'); }
+});
+clearShareBtn.addEventListener('click', ()=>{ history.replaceState(null,'',location.pathname); alert('Removed share from URL'); });
+
+/* P2P signaling helpers */
+function makePC(){
+  pc = new RTCPeerConnection(pcConfig);
+  pc.onicecandidate = (evt)=>{
+    // we'll export once gathering complete; but also keep list
+    // no-op here
+  };
+  pc.onconnectionstatechange = ()=> {
+    const s = pc.connectionState || pc.iceConnectionState;
+    if(s==='connected' || s==='completed') { setStatus(true); }
+    if(s==='disconnected' || s==='failed' || s==='closed') { setStatus(false); setPeerCount(0); }
+  };
+  pc.ondatachannel = (e) => {
+    setupDataChannel(e.channel);
+  };
+  pc.onicegatheringstatechange = async ()=>{
+    if (pc.iceGatheringState === 'complete') {
+      // ready to export sdp + candidates
+      // nothing automatic — user will copy the outSignal contents (we write it when creating)
     }
-  </script>
+  };
+}
+
+function setupDataChannel(channel){
+  dc = channel;
+  dc.onopen = ()=>{ setStatus(true); setPeerCount(1); syncMethod.textContent='P2P'; console.log('DataChannel open'); /* send initial state */ sendPatch({type:'sync', state}); };
+  dc.onclose = ()=>{ setStatus(false); setPeerCount(0); console.log('DataChannel closed'); };
+  dc.onmessage = (ev)=>{ handleMessage(ev.data); };
+}
+
+function sendRaw(obj){
+  if (!dc || dc.readyState !== 'open') return;
+  try{ dc.send(typeof obj === 'string' ? obj : JSON.stringify(obj)); }catch(e){}
+}
+
+function sendPatch(obj){
+  // send JSON
+  if (dc && dc.readyState === 'open') sendRaw(obj);
+}
+
+/* message handling */
+function handleMessage(raw){
+  try{
+    const msg = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (msg.type === 'patch') {
+      // simple last-write wins for content
+      editor.textContent = msg.content;
+      titleInput.value = msg.title || titleInput.value;
+      saveLocal();
+    } else if (msg.type === 'sync') {
+      // remote full state — accept if newer
+      if (msg.state && (msg.state.updated || 0) > (state.updated || 0)) {
+        state = msg.state;
+        titleInput.value = state.title || 'Untitled';
+        editor.textContent = state.content || '';
+        saveLocal();
+      }
+    }
+  }catch(e){}
+}
+
+/* Manual signaling: create offer */
+createBtn.addEventListener('click', async ()=>{
+  isInitiator = true;
+  makePC();
+  // create datachannel
+  const channel = pc.createDataChannel('notes');
+  setupDataChannel(channel);
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+
+  // wait for ICE to complete (gatheringstate)
+  await waitForIceComplete(pc, 5000);
+
+  const out = exportSignal(pc.localDescription, collectLocalCandidates(pc));
+  outSignal.textContent = out;
+  outSignal.scrollTop = outSignal.scrollHeight;
+});
+
+/* Manual signaling: join by pasting offer, then produce answer */
+joinBtn.addEventListener('click', async ()=>{
+  // expects user to paste an offer into inSignal and click Apply
+  alert('Paste the remote offer (the full share string) into the textbox and click Apply.');
+});
+
+/* Apply incoming signal (offer or answer) */
+applyIn.addEventListener('click', async ()=>{
+  const raw = inSignal.value.trim();
+  if (!raw) return alert('Paste remote string first.');
+  let obj;
+  try{ obj = JSON.parse(atob(raw)); }catch(e){ return alert('Invalid string — not base64 JSON'); }
+
+  // if obj.sdp.type === 'offer' => we are answerer
+  if (obj && obj.sdp && obj.sdp.type === 'offer') {
+    // answerer flow
+    isInitiator = false;
+    makePC();
+    // set remote desc
+    await pc.setRemoteDescription(obj.sdp);
+    // add any remote candidates (if included)
+    if (obj.candidates && obj.candidates.length) {
+      for (const c of obj.candidates) {
+        try{ await pc.addIceCandidate(new RTCIceCandidate(c)); }catch(e){}
+      }
+    }
+    // create answer
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    await waitForIceComplete(pc, 5000);
+    const out = exportSignal(pc.localDescription, collectLocalCandidates(pc));
+    outSignal.textContent = out;
+    outSignal.scrollTop = outSignal.scrollHeight;
+    // now wait for initiator to apply this reply and both sides will connect
+  } else if (obj && obj.sdp && obj.sdp.type === 'answer') {
+    // initiator applying answer
+    if (!pc) { return alert('No local peer connection — create an offer first.'); }
+    try{
+      await pc.setRemoteDescription(obj.sdp);
+      if (obj.candidates && obj.candidates.length) {
+        for (const c of obj.candidates) {
+          try{ await pc.addIceCandidate(new RTCIceCandidate(c)); }catch(e){}
+        }
+      }
+      // connection will proceed
+      alert('Answer applied — waiting for DataChannel to open.');
+    }catch(e){ alert('Failed to apply remote answer: ' + e.message); }
+  } else {
+    alert('Unknown signal format.');
+  }
+});
+
+/* Helpers: ICE gather wait, collect candidates */
+function waitForIceComplete(pc, timeout=5000){
+  return new Promise((res)=>{
+    if (!pc) return res();
+    if (pc.iceGatheringState === 'complete') return res();
+    const done = ()=>{ pc.removeEventListener('icegatheringstatechange', check); clearTimeout(t); res(); };
+    const check = ()=>{ if (pc.iceGatheringState === 'complete') done(); };
+    pc.addEventListener('icegatheringstatechange', check);
+    const t = setTimeout(()=>{ try{ pc.removeEventListener('icegatheringstatechange', check); }catch(e){}; res(); }, timeout);
+  });
+}
+
+function collectLocalCandidates(pc){
+  // browsers don't expose a list of gathered candidates directly.
+  // But we can parse the localDescription SDP for a-lines "a=candidate"
+  const sdp = pc.localDescription && pc.localDescription.sdp || '';
+  const lines = sdp.split(/\r?\n/);
+  const candLines = lines.filter(l=>l.startsWith('a=candidate:'));
+  const candidates = candLines.map(l=>{
+    // convert to RTCIceCandidate-like object: keep the whole line in candidate field
+    return {candidate: l.replace(/^a=/,''), sdpMid: null, sdpMLineIndex: 0};
+  });
+  return candidates;
+}
+
+function exportSignal(sdpObj, candidates){
+  const payload = { sdp: sdpObj, candidates: candidates };
+  const b = btoa(JSON.stringify(payload));
+  return b;
+}
+
+/* copy/clear out */
+copyOut.addEventListener('click', ()=>{ navigator.clipboard.writeText(outSignal.textContent).then(()=>alert('Copied')); });
+clearOut.addEventListener('click', ()=>{ outSignal.textContent=''; });
+
+/* load saved local state */
+loadLocal();
+
+/* If URL contains share snapshot, load */
+(function loadFromHash(){
+  const m = location.hash.match(/#share=([^&]+)/);
+  if(!m) return;
+  try{ const raw = decodeURIComponent(escape(atob(m[1]))); const obj = JSON.parse(raw); titleInput.value = obj.title||'Shared'; editor.textContent = obj.content||''; saveLocal(); }catch(e){}
+})();
+
+/* Safety: warn before leaving if unsaved editing */
+window.addEventListener('beforeunload', (e)=>{ /* no-op */ });
+
+</script>
 </body>
 </html>
