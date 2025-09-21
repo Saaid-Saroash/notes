@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Live Notes (GitHub Storage)</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #121212;
+      color: #fff;
+      text-align: center;
+      padding: 20px;
+    }
+    textarea {
+      width: 80%;
+      height: 300px;
+      background: #1e1e1e;
+      color: #fff;
+      border: 1px solid #00ffcc;
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 16px;
+    }
+    button {
+      margin-top: 15px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      background: #00ffcc;
+      font-weight: bold;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Live Notes</h1>
+  <textarea id="notes" placeholder="Loading notes..."></textarea>
+  <br>
+  <button onclick="saveNotes()">Save Notes</button>
+
+  <script>
+    const repoOwner = "YOUR-USERNAME";   // <-- replace with your GitHub username
+    const repoName = "live-notes";       // <-- replace with your repo name
+    const filePath = "notes.txt";
+    const branch = "main";               // or "master" depending on repo
+
+    const token = "YOUR-TOKEN-HERE";     // ⚠️ temporary, we’ll secure later
+
+    const notesBox = document.getElementById("notes");
+
+    // Load existing notes
+    fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}?ref=${branch}`, {
+      headers: { Authorization: `token ${token}` }
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.content) {
+        const content = atob(data.content);
+        notesBox.value = content;
+      }
+    });
+
+    // Save notes back to repo
+    function saveNotes() {
+      const content = btoa(notesBox.value);
+      fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`, {
+        method: "PUT",
+        headers: {
+          "Authorization": `token ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          message: "Update notes",
+          content: content,
+          branch: branch,
+          sha: window.latestSha
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert("Notes saved!");
+        window.latestSha = data.content.sha;
+      });
+    }
+  </script>
+</body>
+</html>
